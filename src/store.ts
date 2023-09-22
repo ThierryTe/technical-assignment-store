@@ -1,53 +1,87 @@
-import { JSONArray, JSONObject, JSONPrimitive } from "./json-types";
 
-export type Permission = "r" | "w" | "rw" | "none";
-
-export type StoreResult = Store | JSONPrimitive | undefined;
-
-export type StoreValue =
-  | JSONObject
-  | JSONArray
-  | StoreResult
-  | (() => StoreResult);
-
-export interface IStore {
-  defaultPolicy: Permission;
-  allowedToRead(key: string): boolean;
-  allowedToWrite(key: string): boolean;
-  read(path: string): StoreResult;
-  write(path: string, value: StoreValue): StoreValue;
-  writeEntries(entries: JSONObject): void;
-  entries(): JSONObject;
-}
-
-export function Restrict(...params: unknown[]): any {
-  throw new Error("Method not implemented.");
-}
+import { IStore } from "./interface/store-interface";
+import {JSONObject, JSONValue} from "./types/json-types";
+import { Permission } from "./types/permission-types";
+import { StoreResult } from "./types/store-result-types";
 
 export class Store implements IStore {
-  defaultPolicy: Permission = "rw";
+
+  defaultPolicy: Permission="none";
+  private data: JSONObject = {}
+  
+  constructor() {
+  
+  }
 
   allowedToRead(key: string): boolean {
-    throw new Error("Method not implemented.");
+     const permission = Reflect.getMetadata("permission", this, key);
+    return (
+      this.defaultPolicy === "rw" ||
+      this.defaultPolicy === "r" ||
+      permission === "rw" ||
+      permission === "r"
+    );
   }
+
 
   allowedToWrite(key: string): boolean {
-    throw new Error("Method not implemented.");
+     const permission = Reflect.getMetadata("permission", this, key);
+    return (
+      this.defaultPolicy === "rw" ||
+      this.defaultPolicy === "w" ||
+      permission === "rw" ||
+      permission === "w"
+    );
   }
 
-  read(path: string): StoreResult {
-    throw new Error("Method not implemented.");
+  read(path: string):StoreResult {
+    const keys = path.split(":");
+    let currentData = this.data;
+    for (const key of keys) {
+      if (!currentData.hasOwnProperty(key) || !this.allowedToRead(key)) {
+        throw new Error("Read Access Denied");
+      }
+      currentData = currentData[key] as JSONObject;
+    }
+    return currentData as unknown as StoreResult;
   }
 
-  write(path: string, value: StoreValue): StoreValue {
-    throw new Error("Method not implemented.");
+  write(path: string, value: JSONValue): JSONValue {
+   const keys = path.split(":");
+    let currentData = this.data;
+    for (let i = 0; i < keys.length - 1; i++) {
+        const key = keys[i];
+        if (!currentData.hasOwnProperty(key) || !this.allowedToWrite(key)) {
+            throw new Error("Write Access Denied");
+        }
+        if (!currentData[key] || typeof currentData[key] !== "object") {
+            currentData[key] = {};
+        }
+        currentData = currentData[key] as JSONObject;
+    }
+    const lastKey = keys[keys.length - 1];
+    if (!currentData.hasOwnProperty(lastKey) || !this.allowedToWrite(lastKey)) {
+        throw new Error("Write Access Denied");
+    }
+    currentData[lastKey] = value as JSONValue;
+    return value;
   }
 
   writeEntries(entries: JSONObject): void {
-    throw new Error("Method not implemented.");
+     for (const key in entries) {
+      if (entries.hasOwnProperty(key) && this.allowedToWrite(key)) {
+        this.data[key] = entries[key];
+      }
+    }
   }
 
   entries(): JSONObject {
-    throw new Error("Method not implemented.");
+     const result: JSONObject = {};
+  for (const key of Object.keys(this.data)) {
+    if (this.allowedToRead(key)) {
+      result[key] = this.data[key];
+    }
+  }
+  return result;
   }
 }

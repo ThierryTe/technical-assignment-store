@@ -1,8 +1,11 @@
-import { JSONObject } from "../src/json-types";
-import { Permission, Restrict, Store } from "../src/store";
+
 import { UserStore } from "../src/userStore";
 import { AdminStore } from "./../src/adminStore";
 import { lazy } from "../src/lazy";
+import { Store } from "../src/store";
+import { JSONObject } from "../src/types/json-types";
+import { Restrict } from "../src/decorator/restrict-decorator";
+import { Permission } from "../src/types/permission-types";
 
 /*
 
@@ -28,11 +31,11 @@ describe("UserStore class - Basic Operations", () => {
     expect(userStore.read("name")).toBe("Jhone Known");
   });
 
-  it("should allow reading non existing keys", () => {
+  it("should allow reading non-existing keys", () => {
     expect(userStore.allowedToRead("nonExistingKey")).toBe(true);
   });
 
-  it("should allow writing non existing keys", () => {
+  it("should allow writing non-existing keys", () => {
     expect(userStore.allowedToWrite("nonExistingKey")).toBe(true);
   });
 });
@@ -54,7 +57,7 @@ describe("AdminStore class - Inheritance and Permissions", () => {
   });
 
   it("should disallow reading admin name", () => {
-    expect(() => adminStore.read("name")).toThrow();
+    expect(() => adminStore.read("name")).toThrowError("Read Access Denied");
   });
 
   it("should not allow reading disallowed keys", () => {
@@ -102,11 +105,11 @@ describe("Nested Store Operations", () => {
   });
 
   it("should disallow writing nested keys in admin store", () => {
-    expect(() => adminStore.write("profile:name", "John Smith")).toThrow();
+    expect(() => adminStore.write("profile:name", "John Smith")).toThrowError("Write Access Denied");
   });
 
   it("should disallow reading nested keys in admin store", () => {
-    expect(() => adminStore.read("profile:name")).toThrow();
+    expect(() => adminStore.read("profile:name")).toThrowError("Read Access Denied");
   });
 
   it("should write multiple entries to the store", () => {
@@ -167,25 +170,25 @@ describe("Restricted Store", () => {
   it("write restricted key", () => {
     expect(() => {
       return store.write("restrictedKey", "testValue");
-    }).toThrow(Error);
+    }).toThrowError("Write Access Denied");
   });
 
   it("read restricted key", () => {
     expect(() => {
       return store.read("restrictedKey");
-    }).toThrow(Error);
+    }).toThrowError("Read Access Denied");
   });
 
   it("write nested restricted key", () => {
     expect(() => {
       return store.write("nested:restrictedKey", "testValue");
-    }).toThrow(Error);
+    }).toThrowError("Write Access Denied");
   });
 
   it("read nested restricted key", () => {
     expect(() => {
       return store.read("nested:restrictedKey");
-    }).toThrow(Error);
+    }).toThrowError("Read Access Denied");
   });
 });
 
@@ -206,7 +209,7 @@ describe("Test Store - Decorators", () => {
     const testStore = new TestStore();
     expect(() => {
       testStore.write("restrictedProp", "new value");
-    }).toThrow(Error);
+    }).toThrowError("Write Access Denied");
   });
 
   it("entries method shows restricted properties", () => {
@@ -237,7 +240,7 @@ These tests ensure that default policies are correctly applied to keys with no e
 */
 
 describe("Test Store - Default Policy Behavior", () => {
-  it("disallows writing a key with with default read permission", () => {
+  it("disallows writing a key with the default read permission", () => {
     class TestStore extends Store {
       public defaultPolicy: Permission = "r";
       public nonRestrictedProp?: string;
@@ -245,7 +248,7 @@ describe("Test Store - Default Policy Behavior", () => {
     const testStore = new TestStore();
     expect(() => {
       testStore.write("nonRestrictedProp", "testValue");
-    }).toThrow(Error);
+    }).toThrowError("Write Access Denied");
   });
 
   it("allows writing a key with no explicit permissions", () => {
@@ -256,7 +259,7 @@ describe("Test Store - Default Policy Behavior", () => {
     const testStore = new TestStore();
     expect(() => {
       testStore.write("nonRestrictedProp", "new value");
-    }).toThrow(Error);
+    }).toThrowError("Write Access Denied");
   });
 });
 
@@ -285,7 +288,7 @@ These tests verify the behavior of the system when keys are overwritten or permi
 */
 
 describe("Test Store - Behavior when Same Key is Used Multiple Times", () => {
-  it("overwrites key with new value", () => {
+  it("overwrites key with a new value", () => {
     const store = new Store();
     store.defaultPolicy = "rw";
     store.write("key", "value1");
